@@ -21,7 +21,6 @@ prompt_for_var() {
     # 如果用户直接按 Enter (输入为空)，则使用默认值
     echo "${user_input:-$default_value}"
 }
-
 # --- 检查 .env 文件是否存在 ---
 if [ -f ".env" ]; then
     # -n 1 表示读取一个字符后立即返回，-r 表示禁止反斜杠转义
@@ -43,10 +42,20 @@ echo
 # CUDA_VERSION: 尝试从 nvidia-smi 获取，如果命令不存在则留空
 DEFAULT_CUDA_VERSION=""
 if command -v nvidia-smi &> /dev/null; then
-    # 使用 sed 从 nvidia-smi 的输出中提取 CUDA 版本号
-    # tr -d '[:space:]' 用于删除可能存在的空白字符
-    DEFAULT_CUDA_VERSION=$(nvidia-smi | sed -n 's/.*CUDA Version: \([0-9.]\+\).*/\1/p' | tr -d '[:space:]')
+    # 提取 nvidia-smi 中的 CUDA 版本，如 "12.1"
+    raw_version=$(nvidia-smi | sed -n 's/.*CUDA Version: \([0-9.]\+\).*/\1/p' | tr -d '[:space:]')
+    if [[ "$raw_version" =~ ^[0-9]+\.[0-9]+$ ]]; then
+        # 如果版本是 x.y 格式（如 12.1），自动补全为 x.y.0（如 12.1.0）
+        DEFAULT_CUDA_VERSION="${raw_version}.0"
+    elif [[ "$raw_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        # 如果已经是 x.y.z 格式，直接使用
+        DEFAULT_CUDA_VERSION="$raw_version"
+    else
+        # 无法解析
+        DEFAULT_CUDA_VERSION=""
+    fi
 fi
+
 # 检查是否成功获取版本号，如果失败则提供一个通用示例
 if [ -z "$DEFAULT_CUDA_VERSION" ]; then
     echo "警告: 未能通过 nvidia-smi 自动检测到 CUDA 版本。请手动输入。"
